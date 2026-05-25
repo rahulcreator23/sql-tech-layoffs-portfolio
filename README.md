@@ -1,6 +1,6 @@
 # 🧠 Tech Layoffs & Hiring Trends — SQL Portfolio Project
 
-> A production-grade SQL project built on a **12,000-row** real-world dataset covering tech layoffs, AI automation impact, hiring trends, and market conditions across 6 countries and 7 industries (2023–2026).
+> A production-grade SQL project built on a **12,000-row** real-world dataset covering tech layoffs, AI automation impact, hiring trends, and market conditions across 6 countries and 7 industries (2024–2026).
 
 ---
 
