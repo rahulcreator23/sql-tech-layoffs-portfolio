@@ -112,9 +112,11 @@ The `interview/09_interview_questions.sql` file contains **30+ curated questions
 
 ---
 
-## 👤 Author
+## 👤 Rahul Prasad
 
 Built as a SQL portfolio project to demonstrate data analysis skills on real-world tech industry data.
 
-**Connect on LinkedIn:** [your-linkedin-url]  
-**GitHub:** [your-github-url]
+**Connect on LinkedIn:** www.linkedin.com/in/
+rahul-prasad-1a9577257
+ 
+**GitHub:** https://github.com/rahulcreator23
