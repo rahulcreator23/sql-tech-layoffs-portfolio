@@ -1,8 +1,8 @@
 -- =============================================================================
--- FILE: 01_schema_ddl.sql (MySQL Version)
+-- FILE: 01_schema_ddl.sql
 -- PROJECT: Tech Layoffs & Hiring Trends SQL Portfolio
 -- DESCRIPTION: DDL — Table definition, constraints, indexes, lookup tables
--- DIALECT: MySQL 8.0+
+-- DIALECT: PostgreSQL (with MySQL/SQLite notes where applicable)
 -- =============================================================================
 
 
@@ -10,22 +10,25 @@
 -- SECTION 1: Create Database (run as superuser)
 -- -----------------------------------------------------------------------------
 
-CREATE DATABASE IF NOT EXISTS tech_layoffs_db
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
+-- PostgreSQL
+CREATE DATABASE tech_layoffs_db
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'en_US.UTF-8'
+    LC_CTYPE   = 'en_US.UTF-8';
 
-USE tech_layoffs_db;
+-- MySQL equivalent:
+-- CREATE DATABASE tech_layoffs_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------------------------------
 -- SECTION 2: ENUM / Lookup Tables
 -- Best practice: normalize repeating categorical values into lookup tables
+-- (Alternative: use CHECK constraints — shown in main table below)
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE dim_industry (
-    industry_id   INT           NOT NULL AUTO_INCREMENT,
-    industry_name VARCHAR(50)   NOT NULL UNIQUE,
-    PRIMARY KEY (industry_id)
+    industry_id   SERIAL        PRIMARY KEY,
+    industry_name VARCHAR(50)   NOT NULL UNIQUE
 );
 
 INSERT INTO dim_industry (industry_name) VALUES
@@ -39,10 +42,9 @@ INSERT INTO dim_industry (industry_name) VALUES
 
 
 CREATE TABLE dim_country (
-    country_id   INT          NOT NULL AUTO_INCREMENT,
+    country_id   SERIAL       PRIMARY KEY,
     country_name VARCHAR(60)  NOT NULL UNIQUE,
-    region       VARCHAR(30),
-    PRIMARY KEY (country_id)
+    region       VARCHAR(30)            -- e.g., 'Asia', 'North America', 'Europe'
 );
 
 INSERT INTO dim_country (country_name, region) VALUES
@@ -55,11 +57,10 @@ INSERT INTO dim_country (country_name, region) VALUES
 
 
 CREATE TABLE dim_company_size (
-    size_id        INT          NOT NULL AUTO_INCREMENT,
-    size_label     VARCHAR(20)  NOT NULL UNIQUE,
-    min_headcount  INT,
-    max_headcount  INT,
-    PRIMARY KEY (size_id)
+    size_id     SERIAL       PRIMARY KEY,
+    size_label  VARCHAR(20)  NOT NULL UNIQUE,
+    min_headcount INT,
+    max_headcount INT
 );
 
 INSERT INTO dim_company_size (size_label, min_headcount, max_headcount) VALUES
@@ -86,63 +87,57 @@ CREATE TABLE tech_layoffs (
 
     -- Time dimension
     month                  VARCHAR(3)      NOT NULL,  -- 'Jan', 'Feb', ...
-    year                   SMALLINT        NOT NULL,
+    year                   SMALLINT        NOT NULL
                                CHECK (year BETWEEN 2020 AND 2030),
 
     -- Layoff metrics
-    layoffs_count          INT             NOT NULL DEFAULT 0,
+    layoffs_count          INT             NOT NULL DEFAULT 0
                                CHECK (layoffs_count >= 0),
-    layoff_percentage      DECIMAL(5,2)    NOT NULL,
+    layoff_percentage      NUMERIC(5,2)    NOT NULL
                                CHECK (layoff_percentage BETWEEN 0 AND 100),
     reason_for_layoffs     VARCHAR(60)     NOT NULL,
 
     -- AI impact scores (0.0 – 10.0 scale)
-    ai_automation_impact   DECIMAL(4,1)    CHECK (ai_automation_impact BETWEEN 0 AND 10),
-    ai_replacement_risk    DECIMAL(4,1)    CHECK (ai_replacement_risk  BETWEEN 0 AND 10),
+    ai_automation_impact   NUMERIC(4,1)    CHECK (ai_automation_impact BETWEEN 0 AND 10),
+    ai_replacement_risk    NUMERIC(4,1)    CHECK (ai_replacement_risk  BETWEEN 0 AND 10),
 
     -- Hiring metrics
     open_roles             INT             DEFAULT 0 CHECK (open_roles >= 0),
-    hiring_trend           VARCHAR(25)     NOT NULL,
-    remote_jobs_percentage DECIMAL(5,2)    CHECK (remote_jobs_percentage BETWEEN 0 AND 100),
+    hiring_trend           VARCHAR(25)     NOT NULL
+                               CHECK (hiring_trend IN (
+                                   'Aggressive Hiring', 'Moderate Hiring',
+                                   'Hiring Freeze', 'Downsizing'
+                               )),
+    remote_jobs_percentage NUMERIC(5,2)    CHECK (remote_jobs_percentage BETWEEN 0 AND 100),
     top_hiring_role        VARCHAR(60),
 
     -- Financial metrics
-    stock_growth_percent   DECIMAL(7,2),
-    revenue_growth_percent DECIMAL(7,2),
-    salary_budget_change   DECIMAL(7,2),
+    stock_growth_percent   NUMERIC(7,2),
+    revenue_growth_percent NUMERIC(7,2),
+    salary_budget_change   NUMERIC(7,2),
 
     -- Sentiment / adoption scores
-    ai_adoption_level      DECIMAL(4,1)    CHECK (ai_adoption_level   BETWEEN 0 AND 10),
-    employee_sentiment     DECIMAL(4,1)    CHECK (employee_sentiment   BETWEEN 0 AND 10),
-    job_security_score     DECIMAL(4,1)    CHECK (job_security_score   BETWEEN 0 AND 10),
+    ai_adoption_level      NUMERIC(4,1)    CHECK (ai_adoption_level   BETWEEN 0 AND 10),
+    employee_sentiment     NUMERIC(4,1)    CHECK (employee_sentiment   BETWEEN 0 AND 10),
+    job_security_score     NUMERIC(4,1)    CHECK (job_security_score   BETWEEN 0 AND 10),
 
     -- Market
-    market_condition       VARCHAR(20)     NOT NULL,
+    market_condition       VARCHAR(20)     NOT NULL
+                               CHECK (market_condition IN ('Bull Market','Recession','Stable')),
 
     -- Audit columns (good practice for production tables)
-    created_at             TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
-    updated_at             TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    created_at             TIMESTAMPTZ     DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ     DEFAULT NOW()
 
 );
 
--- Add CHECK constraints using separate ALTER statements (MySQL 8.0.16+)
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_year CHECK (year BETWEEN 2020 AND 2030);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_layoffs_count CHECK (layoffs_count >= 0);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_layoff_percentage CHECK (layoff_percentage BETWEEN 0 AND 100);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_ai_automation_impact CHECK (ai_automation_impact BETWEEN 0 AND 10);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_ai_replacement_risk CHECK (ai_replacement_risk BETWEEN 0 AND 10);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_open_roles CHECK (open_roles >= 0);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_remote_jobs_percentage CHECK (remote_jobs_percentage BETWEEN 0 AND 100);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_ai_adoption_level CHECK (ai_adoption_level BETWEEN 0 AND 10);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_employee_sentiment CHECK (employee_sentiment BETWEEN 0 AND 10);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_job_security_score CHECK (job_security_score BETWEEN 0 AND 10);
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_hiring_trend CHECK (hiring_trend IN (
-    'Aggressive Hiring', 'Moderate Hiring', 'Hiring Freeze', 'Downsizing'
-));
-ALTER TABLE tech_layoffs ADD CONSTRAINT chk_market_condition CHECK (market_condition IN ('Bull Market','Recession','Stable'));
-
--- Comment the table and key columns (MySQL alternative to PostgreSQL COMMENT)
-ALTER TABLE tech_layoffs COMMENT = 'Fact table: one row per company-month layoff/hiring event, 2023–2026';
+-- Comment the table and key columns (useful in tools like DBeaver, pgAdmin)
+COMMENT ON TABLE tech_layoffs IS
+    'Fact table: one row per company-month layoff/hiring event, 2023–2026';
+COMMENT ON COLUMN tech_layoffs.ai_automation_impact IS
+    'Score 0–10: how much AI automation drove this event';
+COMMENT ON COLUMN tech_layoffs.ai_replacement_risk IS
+    'Score 0–10: likelihood that AI replaces roles in this company';
 
 
 -- -----------------------------------------------------------------------------
@@ -162,28 +157,33 @@ CREATE INDEX idx_layoffs_industry
 CREATE INDEX idx_layoffs_year_month
     ON tech_layoffs (year, month);
 
--- Partial index equivalent (MySQL doesn't have partial indexes, using filtered index comment)
--- For MySQL 8.0+, you can use functional indexes or just a regular index
+-- Partial index: only rows with a hiring freeze (selective, small index)
 CREATE INDEX idx_layoffs_freeze
-    ON tech_layoffs (company_name, year);
+    ON tech_layoffs (company_name, year)
+    WHERE hiring_trend = 'Hiring Freeze';
 
 -- Index for AI risk analysis queries
 CREATE INDEX idx_layoffs_ai_risk
     ON tech_layoffs (ai_replacement_risk, ai_adoption_level);
 
--- Full-text index on company name (MySQL)
-CREATE FULLTEXT INDEX idx_layoffs_company_name
-    ON tech_layoffs (company_name);
+-- Full-text index on company name (PostgreSQL)
+CREATE INDEX idx_layoffs_company_name
+    ON tech_layoffs USING GIN (to_tsvector('english', company_name));
+
+-- MySQL equivalent:
+-- CREATE FULLTEXT INDEX idx_layoffs_company_name ON tech_layoffs (company_name);
 
 
 -- -----------------------------------------------------------------------------
 -- SECTION 5: ALTER TABLE examples (demonstrating schema evolution)
 -- -----------------------------------------------------------------------------
 
--- Add a computed/derived column for net workforce change (MySQL syntax)
+-- Add a computed/derived column for net workforce change
 ALTER TABLE tech_layoffs
     ADD COLUMN net_headcount_change INT
         GENERATED ALWAYS AS (open_roles - layoffs_count) STORED;
+-- MySQL: use AS (open_roles - layoffs_count) STORED
+-- SQLite: does not support generated columns before version 3.31
 
 -- Add a soft-delete flag (production best practice)
 ALTER TABLE tech_layoffs
@@ -195,27 +195,29 @@ ALTER TABLE tech_layoffs
 
 
 -- -----------------------------------------------------------------------------
--- SECTION 6: Trigger — auto-update updated_at on row change (MySQL)
+-- SECTION 6: Trigger — auto-update updated_at on row change (PostgreSQL)
 -- -----------------------------------------------------------------------------
 
-DELIMITER $$
+CREATE OR REPLACE FUNCTION fn_set_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
 
-CREATE TRIGGER trg_layoffs_before_update
+CREATE TRIGGER trg_layoffs_updated_at
     BEFORE UPDATE ON tech_layoffs
     FOR EACH ROW
-BEGIN
-    SET NEW.updated_at = NOW();
-END$$
-
-DELIMITER ;
+    EXECUTE FUNCTION fn_set_updated_at();
 
 
 -- -----------------------------------------------------------------------------
--- SECTION 7: View for industry summary (MySQL doesn't have materialized views)
--- Use a regular view, or create a table + scheduled event for materialized equivalent
+-- SECTION 7: Materialized View (PostgreSQL) for performance
+-- Refreshed on demand; avoid hitting base table for dashboards
 -- -----------------------------------------------------------------------------
 
-CREATE VIEW v_industry_summary AS
+CREATE MATERIALIZED VIEW mv_industry_summary AS
 SELECT
     industry,
     year,
@@ -230,23 +232,14 @@ WHERE is_deleted = FALSE
 GROUP BY industry, year
 ORDER BY year DESC, total_layoffs DESC;
 
+-- Refresh when base data changes:
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY mv_industry_summary;
 
--- -----------------------------------------------------------------------------
--- SECTION 8: Stored Procedure Example (MySQL alternative to PostgreSQL functions)
--- -----------------------------------------------------------------------------
-
-DELIMITER $$
-
-CREATE PROCEDURE sp_refresh_industry_summary()
-BEGIN
-    -- For MySQL, simply query the view
-    -- Or if you want a materialized approach, truncate and repopulate a summary table
-    SELECT * FROM v_industry_summary;
-END$$
-
-DELIMITER ;
+-- Index on the materialized view
+CREATE INDEX idx_mv_industry_year
+    ON mv_industry_summary (industry, year);
 
 
 -- =============================================================================
--- END OF FILE: 01_schema_ddl.sql (MySQL Version)
+-- END OF FILE: 01_schema_ddl.sql
 -- =============================================================================
